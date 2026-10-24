@@ -27,6 +27,7 @@ class TurbineControlRoomApp:
         # المتغيرات الهندسية
         self.fuel_valve = 50.0        # %
         self.fogging = False          # تبريد السحب
+        self.water_injection = False  # نظام حقن الماء لمكافحة الحرارة القصوى
         self.ambient_temp = 42.0      # °C
         self.grid_demand = 175.0      # MW
 
@@ -44,7 +45,7 @@ class TurbineControlRoomApp:
 
         lbl_title = tk.Label(
             header_frame,
-            text="🏭 محطة كهرباء شط البصرة - لوحة تحكم التوربينة الغازية",
+            text="🏭 محطة كهرباء البصرة الكبرى - بقيادة المهندس محمد",
             font=("Segoe UI", 16, "bold"),
             fg="#00d2ff",
             bg="#262b36"
@@ -134,10 +135,13 @@ class TurbineControlRoomApp:
         indicators_frame.pack(fill="x")
 
         self.lbl_valve = tk.Label(indicators_frame, text="صمام الوقود: 50.0%", font=("Segoe UI", 11, "bold"), fg="#e0e1dd", bg="#2b303c", padx=10, pady=4)
-        self.lbl_valve.pack(side="right", padx=10)
+        self.lbl_valve.pack(side="right", padx=6)
 
         self.lbl_cooling = tk.Label(indicators_frame, text="تبريد السحب: مُغلق 🛑", font=("Segoe UI", 11, "bold"), fg="#ff4d6d", bg="#2b303c", padx=10, pady=4)
-        self.lbl_cooling.pack(side="right", padx=10)
+        self.lbl_cooling.pack(side="right", padx=6)
+
+        self.lbl_water = tk.Label(indicators_frame, text="حقن الماء: مُغلق 🛑", font=("Segoe UI", 11, "bold"), fg="#ff4d6d", bg="#2b303c", padx=10, pady=4)
+        self.lbl_water.pack(side="right", padx=6)
 
         # 4. صندوق التنبيهات والأحداث الهندسية
         self.log_box = tk.Text(
@@ -165,8 +169,11 @@ class TurbineControlRoomApp:
         self.btn_fuel_down = tk.Button(ctrl_frame, text="➖ تقليل الوقود (-10%)", bg="#023e8a", fg="white", command=lambda: self.adjust_fuel(-10.0), **btn_style)
         self.btn_fuel_down.pack(side="right", padx=5)
 
-        self.btn_fogging = tk.Button(ctrl_frame, text="❄️ تفعيل/إيقاف تبريد السحب", bg="#0096c7", fg="white", command=self.toggle_fogging, **btn_style)
+        self.btn_fogging = tk.Button(ctrl_frame, text="❄️ تبريد السحب", bg="#0096c7", fg="white", command=self.toggle_fogging, **btn_style)
         self.btn_fogging.pack(side="right", padx=5)
+
+        self.btn_water = tk.Button(ctrl_frame, text="💧 حقن الماء (Water)", bg="#1d3557", fg="white", command=self.toggle_water_injection, **btn_style)
+        self.btn_water.pack(side="right", padx=5)
 
         self.btn_next = tk.Button(ctrl_frame, text="⏩ تطبيق والانتقال للجولة التالية", bg="#38b000", fg="white", command=self.next_round, **btn_style)
         self.btn_next.pack(side="left", padx=5)
@@ -190,9 +197,19 @@ class TurbineControlRoomApp:
         self.log_message(f"تم {state_str} نظام تبريد هواء السحب بالرذاذ.")
         self.update_simulation()
 
+    def toggle_water_injection(self):
+        if self.game_over:
+            return
+        self.water_injection = not self.water_injection
+        state_str = "تشغيل 💧" if self.water_injection else "إيقاف 🛑"
+        self.log_message(f"تم {state_str} نظام حقن الماء لمكافحة الحرارة ورفع كثافة الغاز!")
+        self.update_simulation()
+
     def update_simulation(self):
-        cooling_effect = 25.0 if self.fogging else 0.0
-        self.power_generated = (self.fuel_valve * 2.5) - (self.ambient_temp * 0.8) + (cooling_effect * 0.6)
+        cooling_effect = (25.0 if self.fogging else 0.0) + (45.0 if self.water_injection else 0.0)
+        water_boost = 18.0 if self.water_injection else 0.0
+
+        self.power_generated = (self.fuel_valve * 2.5) - (self.ambient_temp * 0.8) + (cooling_effect * 0.6) + water_boost
         self.egt_temp = 420.0 + (self.fuel_valve * 2.6) + (self.ambient_temp * 0.9) - cooling_effect
         self.vibration = 2.0 + (self.fuel_valve * 0.07) + (0.05 * (self.ambient_temp - 35))
 
@@ -213,6 +230,11 @@ class TurbineControlRoomApp:
             self.lbl_cooling.config(text="تبريد السحب: مُفعل ❄️", fg="#00f5d4")
         else:
             self.lbl_cooling.config(text="تبريد السحب: مُغلق 🛑", fg="#ff4d6d")
+
+        if self.water_injection:
+            self.lbl_water.config(text="حقن الماء: مُفعل 💧", fg="#00f5d4")
+        else:
+            self.lbl_water.config(text="حقن الماء: مُغلق 🛑", fg="#ff4d6d")
 
         # فحص كوارث الحماية
         if self.egt_temp >= 650.0:
